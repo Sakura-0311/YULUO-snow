@@ -105,8 +105,7 @@ calc = compute_commitment_summary(pred, order_date_iso="2026-11-19") if ok else 
 
 本仓库含 adapter（F32 权重）与代码，不含基座。**完整版**把底座 `Qwen/Qwen2.5-1.5B-Instruct` 一并打包（`base_model/` 目录），下载后无需再访问 Hugging Face。请到 [v1.0 Release](https://github.com/Sakura-0311/YULUO-snow/releases/tag/v1.0) 下载：
 
-- `YULUO-snow-complete-with-qwen-base.zip.part-aa`
-- `YULUO-snow-complete-with-qwen-base.zip.part-ab`
+- `YULUO-snow-complete-with-qwen-base.zip.part-aa` 到 `part-ag`（共 7 片，缺一不可）
 - `SHA256SUMS.txt`（每片与合并后 zip 的 sha256）
 
 合并与校验：
