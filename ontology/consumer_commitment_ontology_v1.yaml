@@ -1,0 +1,330 @@
+ontology_id: consumer_commitment_ontology
+version: "1.0.0"
+schema_version: "1.0.0"
+domain: "e_commerce_and_subscription_commitment_extraction"
+language: "zh-CN"
+certification_status: "certified_v1_initial"
+created_at: "2026-11-18"
+methodology:
+  inspired_by: "NVIDIA Auto Ontology (https://github.com/NVIDIA/auto-ontology)"
+  workflow_stages:
+    - stage: "Discover"
+      description: "从消费订单页、订阅协议、活动规则文本中发现核心费用与履约概念。"
+    - stage: "Ground_and_Certify"
+      description: "人工审核并固化字段类型、单位（金额统一为整数分）、允许值、同义词与缺失语义（缺省为 unknown 而非否定推断）。"
+    - stage: "Validate"
+      description: "通过结构化 JSON Schema、原文字符级 span 校验器及盲测问题集验证抽取一致性。"
+    - stage: "Expose"
+      description: "通过标准 JSON 输出与确定性计算器接口向前端承诺单视图暴露可解释结论。"
+    - stage: "Learn"
+      description: "根据评估误差与人工纠错迭代本体同义词、歧义/矛盾判定规则并递增本体版本。"
+
+global_rules:
+  monetary_unit: "fen_int" # 人民币分（整数），例如 19.90 元 -> 1990
+  missing_value_policy: "缺失或原文未提及的退款/续费/取消条款必须标注 status=unknown 且数值为 null，严禁外推为否/不退/无扣款。"
+  evidence_policy: "每个非 unknown/非空结论必须附带至少一条原文精确 quote 及 [start_char, end_char) 字符起止位置，且 text[start_char:end_char] == quote。"
+  computation_boundary: "模型仅负责语义抽取与证据对齐；实付合计、满减抵扣、运费叠加、试用期截止日、首年累计费用等算术与日期窗口计算全部交由确定性程序 calculator.py 完成。"
+
+entities:
+  EvidenceSpan:
+    description: "原文片段与精确字符级证据定位"
+    version: "1.0.0"
+    certification_status: "certified"
+    fields:
+      source_id:
+        type: string
+        unit: identifier
+        required: true
+        description: "输入文本来源标识"
+      quote:
+        type: string
+        unit: text
+        required: true
+        description: "原文逐字截取片段（含 OCR 噪声时亦须与输入原文逐字符一致）"
+      start_char:
+        type: integer
+        unit: char_offset_0_based
+        required: true
+        constraints: ">= 0"
+      end_char:
+        type: integer
+        unit: char_offset_0_based
+        required: true
+        constraints: "> start_char"
+    relations:
+      - target: "*"
+        type: "grounds"
+        description: "为所有非 unknown 抽取对象提供原文溯源"
+
+  ProductOrService:
+    description: "被购买或订阅的商品、会员或服务主体"
+    version: "1.0.0"
+    certification_status: "certified"
+    synonyms: ["商品名称", "会员服务", "套餐", "权益包", "课程/软件订阅"]
+    source_mapping: ["订单标题", "商品卡片", "服务协议首段"]
+    fields:
+      name:
+        type: [string, "null"]
+        unit: text
+        required: true
+      category:
+        type: string
+        unit: enum
+        allowed_values: ["subscription", "ecommerce_goods", "digital_service", "hybrid", "unknown"]
+      quantity:
+        type: [integer, "null"]
+        unit: count
+      status:
+        type: string
+        unit: enum
+        allowed_values: ["known", "unknown", "ambiguous", "contradicted"]
+    relations:
+      - target: "PriceItem"
+        type: "has_price_item"
+      - target: "TrialPeriod"
+        type: "may_have_trial"
+
+  PriceItem:
+    description: "订单或条款中出现的具体价格构成项"
+    version: "1.0.0"
+    certification_status: "certified"
+    synonyms: ["标价", "原价", "到手价", "首月价", "工本费", "服务费"]
+    source_mapping: ["价格明细", "结算页条目", "小字说明"]
+    fields:
+      item_type:
+        type: string
+        unit: enum
+        allowed_values: ["base_price", "first_period_promo", "recurring_standard", "deposit", "service_fee", "other"]
+      label:
+        type: string
+        unit: text
+      amount_fen:
+        type: [integer, "null"]
+        unit: fen_int
+        constraints: ">= 0"
+      status:
+        type: string
+        unit: enum
+        allowed_values: ["known", "unknown", "ambiguous", "contradicted"]
+    relations:
+      - target: "EvidenceSpan"
+        type: "supported_by"
+
+  TrialPeriod:
+    description: "免费或低价试用期及其转正约束"
+    version: "1.0.0"
+    certification_status: "certified"
+    synonyms: ["免费试用", "体验期", "0元体验", "首周特惠试用", "7天免费体验"]
+    source_mapping: ["活动横幅", "试用协议", "勾选框旁小字"]
+    fields:
+      has_trial:
+        type: [boolean, "null"]
+        unit: boolean
+      duration_value:
+        type: [integer, "null"]
+        unit: duration_number
+      duration_unit:
+        type: string
+        unit: enum
+        allowed_values: ["hour", "day", "week", "month", "unknown"]
+      trial_price_fen:
+        type: [integer, "null"]
+        unit: fen_int
+      auto_convert_to_paid:
+        type: [boolean, "null"]
+        unit: boolean
+        description: "试用期满是否自动转为付费订阅；未写明时必须为 null 且 status=unknown"
+      status:
+        type: string
+        unit: enum
+        allowed_values: ["known", "unknown", "ambiguous", "contradicted"]
+    relations:
+      - target: "InitialCharge"
+        type: "precedes"
+      - target: "RecurringCharge"
+        type: "converts_to"
+
+  InitialCharge:
+    description: "下单当刻或首次触发的实际扣款金额与时机"
+    version: "1.0.0"
+    certification_status: "certified"
+    synonyms: ["首扣", "立即支付", "下单实付", "首期扣费", "首月扣款"]
+    source_mapping: ["支付按钮", "首扣说明", "结算金额"]
+    fields:
+      amount_fen:
+        type: [integer, "null"]
+        unit: fen_int
+      timing_rule:
+        type: string
+        unit: enum
+        allowed_values: ["immediate_on_order", "after_trial_end", "on_activation", "unspecified", "unknown"]
+      status:
+        type: string
+        unit: enum
+        allowed_values: ["known", "unknown", "ambiguous", "contradicted"]
+
+  RecurringCharge:
+    description: "周期性连续扣款金额与自动续费属性"
+    version: "1.0.0"
+    certification_status: "certified"
+    synonyms: ["连续包月", "自动续费", "周期扣款", "次月起按原价", "到期自动扣款"]
+    source_mapping: ["自动续费协议", "订阅说明", "底部灰色小字"]
+    fields:
+      amount_fen:
+        type: [integer, "null"]
+        unit: fen_int
+      is_auto_renew:
+        type: [boolean, "null"]
+        unit: boolean
+        description: "未明确提及是否自动续费时必须为 null 且 status=unknown"
+      status:
+        type: string
+        unit: enum
+        allowed_values: ["known", "unknown", "ambiguous", "contradicted"]
+    relations:
+      - target: "RenewalInterval"
+        type: "billed_every"
+
+  RenewalInterval:
+    description: "续费时间间隔与扣款提前通知天数"
+    version: "1.0.0"
+    certification_status: "certified"
+    synonyms: ["续费周期", "扣款周期", "每期时长", "按月/按季/按年"]
+    source_mapping: ["自动续费条款", "套餐周期描述"]
+    fields:
+      interval_value:
+        type: [integer, "null"]
+        unit: duration_number
+      interval_unit:
+        type: string
+        unit: enum
+        allowed_values: ["day", "week", "month", "quarter", "year", "unknown"]
+      advance_notice_days:
+        type: [integer, "null"]
+        unit: days
+      status:
+        type: string
+        unit: enum
+        allowed_values: ["known", "unknown", "ambiguous", "contradicted"]
+
+  ThresholdDiscount:
+    description: "满减、立减或跨店满减规则（仅抽取规则参数，不直接计算最终实付）"
+    version: "1.0.0"
+    certification_status: "certified"
+    synonyms: ["满减", "满X减Y", "店铺满减", "平台津贴", "阶梯满减"]
+    source_mapping: ["优惠券栏", "促销规则", "满减标签"]
+    fields:
+      threshold_fen:
+        type: [integer, "null"]
+        unit: fen_int
+      discount_fen:
+        type: [integer, "null"]
+        unit: fen_int
+      stackable:
+        type: [boolean, "null"]
+        unit: boolean
+      status:
+        type: string
+        unit: enum
+        allowed_values: ["known", "unknown", "ambiguous", "contradicted"]
+
+  AddOnItem:
+    description: "默认勾选或可选的加购/搭售项目（如延保、会员加购包、运费险）"
+    version: "1.0.0"
+    certification_status: "certified"
+    synonyms: ["加购", "搭售", "默认勾选", "增值服务", "顺手买一件", "延保服务"]
+    source_mapping: ["附加服务区", "复选框条目", "捆绑商品"]
+    fields:
+      name:
+        type: [string, "null"]
+        unit: text
+      amount_fen:
+        type: [integer, "null"]
+        unit: fen_int
+      is_prechecked:
+        type: [boolean, "null"]
+        unit: boolean
+      is_mandatory:
+        type: [boolean, "null"]
+        unit: boolean
+      status:
+        type: string
+        unit: enum
+        allowed_values: ["known", "unknown", "ambiguous", "contradicted"]
+
+  ShippingFee:
+    description: "运费金额与包邮门槛"
+    version: "1.0.0"
+    certification_status: "certified"
+    synonyms: ["运费", "邮费", "配送费", "满额包邮", "偏远地区加收"]
+    source_mapping: ["物流与运费栏", "结算页配送说明"]
+    fields:
+      amount_fen:
+        type: [integer, "null"]
+        unit: fen_int
+      free_shipping_threshold_fen:
+        type: [integer, "null"]
+        unit: fen_int
+      status:
+        type: string
+        unit: enum
+        allowed_values: ["known", "unknown", "ambiguous", "contradicted"]
+
+  CancellationEffect:
+    description: "取消订阅或退订后的生效时机与违约成本"
+    version: "1.0.0"
+    certification_status: "certified"
+    synonyms: ["取消规则", "退订生效", "随时可取消", "下周期生效", "提前解约违约金"]
+    source_mapping: ["退订说明", "解约条款", "FAQ"]
+    fields:
+      effective_timing:
+        type: string
+        unit: enum
+        allowed_values: ["immediate", "end_of_current_period", "after_minimum_term", "unknown"]
+      penalty_fen:
+        type: [integer, "null"]
+        unit: fen_int
+      status:
+        type: string
+        unit: enum
+        allowed_values: ["known", "unknown", "ambiguous", "contradicted"]
+
+  RefundStatus:
+    description: "退款资格、退款时限与扣费规则（缺省严禁推断为不可退）"
+    version: "1.0.0"
+    certification_status: "certified"
+    synonyms: ["退款政策", "七天无理由", "不支持退款", "虚拟商品不退", "按比例退款"]
+    source_mapping: ["售后说明", "退款条款", "购买须知"]
+    fields:
+      refundability:
+        type: string
+        unit: enum
+        allowed_values: ["full_refund", "partial_refund", "conditional_refund", "non_refundable", "unknown"]
+      refund_window_days:
+        type: [integer, "null"]
+        unit: days
+      status:
+        type: string
+        unit: enum
+        allowed_values: ["known", "unknown", "ambiguous", "contradicted"]
+
+  UncertaintyAndConflict:
+    description: "显式记录条款缺失、表述歧义或前后金额/规则矛盾"
+    version: "1.0.0"
+    certification_status: "certified"
+    synonyms: ["条款冲突", "前后矛盾", "表述模糊", "未说明"]
+    source_mapping: ["全文交叉核对"]
+    fields:
+      issue_type:
+        type: string
+        unit: enum
+        allowed_values: ["unknown", "ambiguous", "contradicted"]
+      target_field:
+        type: string
+        unit: ontology_field_path
+      description:
+        type: string
+        unit: text
+      evidence:
+        type: array
+        items: "EvidenceSpan"

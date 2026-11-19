@@ -1,0 +1,222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/commitment_schema_v1.json",
+  "title": "ConsumerCommitmentExtractionV1",
+  "description": "承诺单：下单前看清账 — 严格结构化抽取与证据对齐 Schema（金额统一为整数分，缺失严禁外推）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "source_id",
+    "product_or_service",
+    "price_items",
+    "trial_period",
+    "initial_charge",
+    "recurring_charge",
+    "renewal_interval",
+    "threshold_discounts",
+    "add_on_items",
+    "shipping_fee",
+    "cancellation_effect",
+    "refund_status",
+    "uncertainties_and_conflicts"
+  ],
+  "$defs": {
+    "FieldStatus": {
+      "type": "string",
+      "enum": ["known", "unknown", "ambiguous", "contradicted"]
+    },
+    "EvidenceSpan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "quote", "start_char", "end_char"],
+      "properties": {
+        "source_id": { "type": "string", "minLength": 1 },
+        "quote": { "type": "string", "minLength": 1 },
+        "start_char": { "type": "integer", "minimum": 0 },
+        "end_char": { "type": "integer", "minimum": 1 }
+      }
+    }
+  },
+  "properties": {
+    "schema_version": { "type": "string", "const": "1.0.0" },
+    "source_id": { "type": "string", "minLength": 1 },
+    "product_or_service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "category", "quantity", "status", "evidence"],
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "category": {
+          "type": "string",
+          "enum": ["subscription", "ecommerce_goods", "digital_service", "hybrid", "unknown"]
+        },
+        "quantity": { "type": ["integer", "null"], "minimum": 1 },
+        "status": { "$ref": "#/$defs/FieldStatus" },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/EvidenceSpan" } }
+      }
+    },
+    "price_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["item_type", "label", "amount_fen", "status", "evidence"],
+        "properties": {
+          "item_type": {
+            "type": "string",
+            "enum": ["base_price", "first_period_promo", "recurring_standard", "deposit", "service_fee", "other"]
+          },
+          "label": { "type": "string" },
+          "amount_fen": { "type": ["integer", "null"], "minimum": 0 },
+          "status": { "$ref": "#/$defs/FieldStatus" },
+          "evidence": { "type": "array", "items": { "$ref": "#/$defs/EvidenceSpan" } }
+        }
+      }
+    },
+    "trial_period": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["has_trial", "duration_value", "duration_unit", "trial_price_fen", "auto_convert_to_paid", "status", "evidence"],
+      "properties": {
+        "has_trial": { "type": ["boolean", "null"] },
+        "duration_value": { "type": ["integer", "null"], "minimum": 1 },
+        "duration_unit": {
+          "type": "string",
+          "enum": ["hour", "day", "week", "month", "unknown"]
+        },
+        "trial_price_fen": { "type": ["integer", "null"], "minimum": 0 },
+        "auto_convert_to_paid": { "type": ["boolean", "null"] },
+        "status": { "$ref": "#/$defs/FieldStatus" },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/EvidenceSpan" } }
+      }
+    },
+    "initial_charge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["amount_fen", "timing_rule", "status", "evidence"],
+      "properties": {
+        "amount_fen": { "type": ["integer", "null"], "minimum": 0 },
+        "timing_rule": {
+          "type": "string",
+          "enum": ["immediate_on_order", "after_trial_end", "on_activation", "unspecified", "unknown"]
+        },
+        "status": { "$ref": "#/$defs/FieldStatus" },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/EvidenceSpan" } }
+      }
+    },
+    "recurring_charge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["amount_fen", "is_auto_renew", "status", "evidence"],
+      "properties": {
+        "amount_fen": { "type": ["integer", "null"], "minimum": 0 },
+        "is_auto_renew": { "type": ["boolean", "null"] },
+        "status": { "$ref": "#/$defs/FieldStatus" },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/EvidenceSpan" } }
+      }
+    },
+    "renewal_interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["interval_value", "interval_unit", "advance_notice_days", "status", "evidence"],
+      "properties": {
+        "interval_value": { "type": ["integer", "null"], "minimum": 1 },
+        "interval_unit": {
+          "type": "string",
+          "enum": ["day", "week", "month", "quarter", "year", "unknown"]
+        },
+        "advance_notice_days": { "type": ["integer", "null"], "minimum": 0 },
+        "status": { "$ref": "#/$defs/FieldStatus" },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/EvidenceSpan" } }
+      }
+    },
+    "threshold_discounts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["threshold_fen", "discount_fen", "stackable", "status", "evidence"],
+        "properties": {
+          "threshold_fen": { "type": ["integer", "null"], "minimum": 0 },
+          "discount_fen": { "type": ["integer", "null"], "minimum": 0 },
+          "stackable": { "type": ["boolean", "null"] },
+          "status": { "$ref": "#/$defs/FieldStatus" },
+          "evidence": { "type": "array", "items": { "$ref": "#/$defs/EvidenceSpan" } }
+        }
+      }
+    },
+    "add_on_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "amount_fen", "is_prechecked", "is_mandatory", "status", "evidence"],
+        "properties": {
+          "name": { "type": ["string", "null"] },
+          "amount_fen": { "type": ["integer", "null"], "minimum": 0 },
+          "is_prechecked": { "type": ["boolean", "null"] },
+          "is_mandatory": { "type": ["boolean", "null"] },
+          "status": { "$ref": "#/$defs/FieldStatus" },
+          "evidence": { "type": "array", "items": { "$ref": "#/$defs/EvidenceSpan" } }
+        }
+      }
+    },
+    "shipping_fee": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["amount_fen", "free_shipping_threshold_fen", "status", "evidence"],
+      "properties": {
+        "amount_fen": { "type": ["integer", "null"], "minimum": 0 },
+        "free_shipping_threshold_fen": { "type": ["integer", "null"], "minimum": 0 },
+        "status": { "$ref": "#/$defs/FieldStatus" },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/EvidenceSpan" } }
+      }
+    },
+    "cancellation_effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["effective_timing", "penalty_fen", "status", "evidence"],
+      "properties": {
+        "effective_timing": {
+          "type": "string",
+          "enum": ["immediate", "end_of_current_period", "after_minimum_term", "unknown"]
+        },
+        "penalty_fen": { "type": ["integer", "null"], "minimum": 0 },
+        "status": { "$ref": "#/$defs/FieldStatus" },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/EvidenceSpan" } }
+      }
+    },
+    "refund_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["refundability", "refund_window_days", "status", "evidence"],
+      "properties": {
+        "refundability": {
+          "type": "string",
+          "enum": ["full_refund", "partial_refund", "conditional_refund", "non_refundable", "unknown"]
+        },
+        "refund_window_days": { "type": ["integer", "null"], "minimum": 0 },
+        "status": { "$ref": "#/$defs/FieldStatus" },
+        "evidence": { "type": "array", "items": { "$ref": "#/$defs/EvidenceSpan" } }
+      }
+    },
+    "uncertainties_and_conflicts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["issue_type", "target_field", "description", "evidence"],
+        "properties": {
+          "issue_type": {
+            "type": "string",
+            "enum": ["unknown", "ambiguous", "contradicted"]
+          },
+          "target_field": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1 },
+          "evidence": { "type": "array", "items": { "$ref": "#/$defs/EvidenceSpan" } }
+        }
+      }
+    }
+  }
+}

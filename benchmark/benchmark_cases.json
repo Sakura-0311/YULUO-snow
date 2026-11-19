@@ -1,0 +1,316 @@
+{
+  "version": "0.1",
+  "language": "zh-CN",
+  "data_status": "synthetic_demo_and_smoke_cases",
+  "notice": "以下文字均为虚构合成样例，尚未用于模型训练或性能评估；不可据此宣称真实场景准确率。",
+  "horizon_rule": "第N日表示距开通日N天；N日总支出统计开通日到第N-1日（含）发生的扣款。",
+  "cases": [
+    {
+      "id": "DEMO-01",
+      "split": "demo",
+      "scenario": "首月特价自动续费",
+      "input_text": "新客首月0.1元。首月结束后每30天按25元自动续费。可随时关闭自动续费，关闭后权益保留至当前已付周期结束；已付金额不退。",
+      "gold": {
+        "initial_payment_yuan": "0.10",
+        "trial_days": null,
+        "auto_renew": "yes",
+        "renewal_amount_yuan": "25.00",
+        "renewal_interval_days": 30,
+        "first_renewal_day": 30,
+        "one_time_fees_yuan": [],
+        "cancellation": "可随时关闭；关闭后权益保留至当前已付周期结束",
+        "refund": "已付金额不退",
+        "total_cost_yuan": {"30_days": "0.10", "90_days": "50.10", "365_days": "300.10"},
+        "must_flag_unknown_or_conflict": false,
+        "evidence": {
+          "initial_payment_yuan": "新客首月0.1元",
+          "renewal_amount_yuan": "每30天按25元自动续费",
+          "cancellation": "可随时关闭自动续费，关闭后权益保留至当前已付周期结束",
+          "refund": "已付金额不退"
+        }
+      }
+    },
+    {
+      "id": "DEMO-02",
+      "split": "demo",
+      "scenario": "免费试用转月付",
+      "input_text": "开通后前7天免费。第7天扣19.9元，之后每30天扣19.9元。自动续费；取消后在当前已付周期结束时停止服务。页面未说明已扣款是否退款。",
+      "gold": {
+        "initial_payment_yuan": "0.00",
+        "trial_days": 7,
+        "auto_renew": "yes",
+        "renewal_amount_yuan": "19.90",
+        "renewal_interval_days": 30,
+        "first_renewal_day": 7,
+        "one_time_fees_yuan": [],
+        "cancellation": "取消后在当前已付周期结束时停止服务",
+        "refund": null,
+        "total_cost_yuan": {"30_days": "19.90", "90_days": "59.70", "365_days": "238.80"},
+        "must_flag_unknown_or_conflict": true,
+        "evidence": {
+          "trial_days": "前7天免费",
+          "renewal_amount_yuan": "第7天扣19.9元，之后每30天扣19.9元",
+          "auto_renew": "自动续费",
+          "cancellation": "取消后在当前已付周期结束时停止服务",
+          "refund": "页面未说明已扣款是否退款"
+        }
+      }
+    },
+    {
+      "id": "DEMO-03",
+      "split": "demo",
+      "scenario": "满减与加购实付比较",
+      "input_text": "商品A售价89元，订单满100元减20元，运费6元。加购商品B需12元；加购后订单可用满减优惠。未加购时不满足满减。",
+      "gold": {
+        "item_price_yuan": "89.00",
+        "threshold_yuan": "100.00",
+        "discount_yuan": "20.00",
+        "shipping_yuan": "6.00",
+        "add_on_price_yuan": "12.00",
+        "total_without_add_on_yuan": "95.00",
+        "total_with_add_on_yuan": "87.00",
+        "net_savings_after_add_on_yuan": "8.00",
+        "auto_renew": "no",
+        "must_flag_unknown_or_conflict": false,
+        "evidence": {
+          "item_price_yuan": "商品A售价89元",
+          "threshold_yuan": "订单满100元减20元",
+          "shipping_yuan": "运费6元",
+          "add_on_price_yuan": "加购商品B需12元"
+        }
+      }
+    },
+    {
+      "id": "TEST-01",
+      "split": "smoke",
+      "scenario": "一次性价格，不应误报续费",
+      "input_text": "本次购买价29元，一次付款，订单完成后不会再次扣款。",
+      "gold": {
+        "initial_payment_yuan": "29.00",
+        "auto_renew": "no",
+        "renewal_amount_yuan": null,
+        "total_cost_yuan": {"30_days": "29.00", "90_days": "29.00", "365_days": "29.00"},
+        "must_flag_unknown_or_conflict": false,
+        "evidence": {
+          "initial_payment_yuan": "本次购买价29元",
+          "auto_renew": "订单完成后不会再次扣款"
+        }
+      }
+    },
+    {
+      "id": "TEST-02",
+      "split": "smoke",
+      "scenario": "续费金额未说明",
+      "input_text": "首月9.9元，之后自动续费，续费价格以扣款前页面显示为准。",
+      "gold": {
+        "initial_payment_yuan": "9.90",
+        "auto_renew": "yes",
+        "renewal_amount_yuan": null,
+        "total_cost_yuan": {"30_days": "9.90", "90_days": null, "365_days": null},
+        "must_flag_unknown_or_conflict": true,
+        "evidence": {
+          "initial_payment_yuan": "首月9.9元",
+          "auto_renew": "之后自动续费",
+          "renewal_amount_yuan": "续费价格以扣款前页面显示为准"
+        }
+      }
+    },
+    {
+      "id": "TEST-03",
+      "split": "smoke",
+      "scenario": "年付自动续费与统计边界",
+      "input_text": "开通时一次扣199元，服务期365天；到期后每年199元自动续费。可在到期前关闭。",
+      "gold": {
+        "initial_payment_yuan": "199.00",
+        "auto_renew": "yes",
+        "renewal_amount_yuan": "199.00",
+        "renewal_interval_days": 365,
+        "first_renewal_day": 365,
+        "total_cost_yuan": {"30_days": "199.00", "90_days": "199.00", "365_days": "199.00"},
+        "must_flag_unknown_or_conflict": false,
+        "evidence": {
+          "initial_payment_yuan": "开通时一次扣199元",
+          "renewal_amount_yuan": "到期后每年199元自动续费",
+          "cancellation": "可在到期前关闭"
+        }
+      }
+    },
+    {
+      "id": "TEST-04",
+      "split": "smoke",
+      "scenario": "分期总成本",
+      "input_text": "分3期支付，每期99元，另收一次性服务费8元。首期立即扣款，后两期分别在30天后和60天后扣款。",
+      "gold": {
+        "installments": [{"day": 0, "amount_yuan": "99.00"}, {"day": 30, "amount_yuan": "99.00"}, {"day": 60, "amount_yuan": "99.00"}],
+        "one_time_fees_yuan": ["8.00"],
+        "total_cost_yuan": {"30_days": "107.00", "90_days": "305.00", "365_days": "305.00"},
+        "auto_renew": "no",
+        "must_flag_unknown_or_conflict": false,
+        "evidence": {
+          "installments": "分3期支付，每期99元",
+          "one_time_fees_yuan": "另收一次性服务费8元",
+          "charge_timing": "首期立即扣款，后两期分别在30天后和60天后扣款"
+        }
+      }
+    },
+    {
+      "id": "TEST-05",
+      "split": "smoke",
+      "scenario": "满减门槛与加购经济性",
+      "input_text": "商品A 72元，订单满80元立减16.8元，满80元免运费；否则运费8元。加购商品B需12元。",
+      "gold": {
+        "item_price_yuan": "72.00",
+        "threshold_yuan": "80.00",
+        "discount_yuan": "16.80",
+        "shipping_below_threshold_yuan": "8.00",
+        "shipping_at_or_above_threshold_yuan": "0.00",
+        "add_on_price_yuan": "12.00",
+        "total_without_add_on_yuan": "80.00",
+        "total_with_add_on_yuan": "67.20",
+        "net_savings_after_add_on_yuan": "12.80",
+        "must_flag_unknown_or_conflict": false,
+        "evidence": {
+          "item_price_yuan": "商品A 72元",
+          "threshold_yuan": "订单满80元立减16.8元",
+          "shipping": "满80元免运费；否则运费8元",
+          "add_on_price_yuan": "加购商品B需12元"
+        }
+      }
+    },
+    {
+      "id": "TEST-06",
+      "split": "smoke",
+      "scenario": "页面价格冲突",
+      "input_text": "页面横幅写“每月19.9元”。价格说明写“连续包月29.9元/月，首月优惠价19.9元”。",
+      "gold": {
+        "initial_payment_yuan": "19.90",
+        "auto_renew": "unclear",
+        "renewal_amount_yuan": "29.90",
+        "renewal_interval_days": null,
+        "total_cost_yuan": {"30_days": null, "90_days": null, "365_days": null},
+        "must_flag_unknown_or_conflict": true,
+        "contradictions": ["横幅的“每月19.9元”与价格说明的“首月优惠价19.9元、之后29.9元/月”表达不一致。"],
+        "evidence": {
+          "banner": "每月19.9元",
+          "price_detail": "连续包月29.9元/月，首月优惠价19.9元"
+        }
+      }
+    },
+    {
+      "id": "TEST-07",
+      "split": "smoke",
+      "scenario": "不同计费周期不可擅自折算",
+      "input_text": "月付29.9元；连续包年199元/年。此页面当前未显示已选方案。",
+      "gold": {
+        "plans": [{"period": "month", "amount_yuan": "29.90"}, {"period": "year", "amount_yuan": "199.00"}],
+        "selected_plan": null,
+        "auto_renew": "unclear",
+        "total_cost_yuan": {"30_days": null, "90_days": null, "365_days": null},
+        "must_flag_unknown_or_conflict": true,
+        "evidence": {
+          "monthly_plan": "月付29.9元",
+          "annual_plan": "连续包年199元/年",
+          "selected_plan": "此页面当前未显示已选方案"
+        }
+      }
+    },
+    {
+      "id": "TEST-08",
+      "split": "smoke",
+      "scenario": "一次性年费与折合月价",
+      "input_text": "年卡199元，一次性收取；页面展示折合每月16.58元。有效期一年，到期不自动续费。",
+      "gold": {
+        "initial_payment_yuan": "199.00",
+        "displayed_monthly_equivalent_yuan": "16.58",
+        "auto_renew": "no",
+        "renewal_amount_yuan": null,
+        "total_cost_yuan": {"30_days": "199.00", "90_days": "199.00", "365_days": "199.00"},
+        "must_flag_unknown_or_conflict": false,
+        "evidence": {
+          "initial_payment_yuan": "年卡199元，一次性收取",
+          "displayed_monthly_equivalent_yuan": "折合每月16.58元",
+          "auto_renew": "到期不自动续费"
+        }
+      }
+    },
+    {
+      "id": "TEST-09",
+      "split": "smoke",
+      "scenario": "免运费门槛不代表省钱",
+      "input_text": "商品A 93元；订单实付满100元免8元运费。加购商品B 9元。无其他优惠。",
+      "gold": {
+        "item_price_yuan": "93.00",
+        "shipping_below_threshold_yuan": "8.00",
+        "threshold_yuan": "100.00",
+        "add_on_price_yuan": "9.00",
+        "total_without_add_on_yuan": "101.00",
+        "total_with_add_on_yuan": "102.00",
+        "net_savings_after_add_on_yuan": "-1.00",
+        "must_flag_unknown_or_conflict": false,
+        "evidence": {
+          "item_price_yuan": "商品A 93元",
+          "threshold_yuan": "订单实付满100元免8元运费",
+          "add_on_price_yuan": "加购商品B 9元"
+        }
+      }
+    },
+    {
+      "id": "TEST-10",
+      "split": "smoke",
+      "scenario": "取消时点缺失",
+      "input_text": "试用期结束后每月扣费30元，自动续费。可以关闭续费；页面没有说明何时关闭才不会产生下一次扣费。",
+      "gold": {
+        "auto_renew": "yes",
+        "renewal_amount_yuan": "30.00",
+        "renewal_interval_days": null,
+        "cancellation": "可以关闭续费，但生效时点未说明",
+        "next_charge_avoidance_deadline": null,
+        "must_flag_unknown_or_conflict": true,
+        "evidence": {
+          "renewal_amount_yuan": "试用期结束后每月扣费30元",
+          "auto_renew": "自动续费",
+          "cancellation": "页面没有说明何时关闭才不会产生下一次扣费"
+        }
+      }
+    },
+    {
+      "id": "TEST-11",
+      "split": "smoke",
+      "scenario": "优惠的满减口径有歧义",
+      "input_text": "满100减20，运费另计。细则没有说明满减门槛按优惠前还是优惠后金额计算。",
+      "gold": {
+        "threshold_yuan": "100.00",
+        "discount_yuan": "20.00",
+        "shipping": "另计",
+        "threshold_basis": "unclear",
+        "total_cost_yuan": null,
+        "must_flag_unknown_or_conflict": true,
+        "evidence": {
+          "threshold_yuan": "满100减20",
+          "shipping": "运费另计",
+          "threshold_basis": "细则没有说明满减门槛按优惠前还是优惠后金额计算"
+        }
+      }
+    },
+    {
+      "id": "TEST-12",
+      "split": "smoke",
+      "scenario": "金额周期文字与日期冲突",
+      "input_text": "说明A：试用7天后开始扣款。说明B：首次扣款日期为开通后第10天。之后每30天续费20元。",
+      "gold": {
+        "auto_renew": "yes",
+        "renewal_amount_yuan": "20.00",
+        "renewal_interval_days": 30,
+        "first_renewal_day": null,
+        "total_cost_yuan": {"30_days": null, "90_days": null, "365_days": null},
+        "must_flag_unknown_or_conflict": true,
+        "contradictions": ["试用结束后扣款时间与明确首次扣款日期不一致。"],
+        "evidence": {
+          "trial_end": "试用7天后开始扣款",
+          "first_charge_date": "首次扣款日期为开通后第10天",
+          "renewal_amount_yuan": "之后每30天续费20元"
+        }
+      }
+    }
+  ]
+}

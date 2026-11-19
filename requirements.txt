@@ -1,0 +1,6 @@
+torch>=2.1
+transformers>=4.45
+peft>=0.12
+bitsandbytes>=0.43
+accelerate>=0.34
+jsonschema>=4.0

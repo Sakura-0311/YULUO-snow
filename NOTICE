@@ -1,0 +1,25 @@
+NOTICE — 许可适用范围说明 / License Scope Notice
+
+YULUO-snow（项目「承诺单：下单前看清账」）v1.0
+
+1. 本项目内容 — CC BY-NC-SA 4.0（禁止商业用途）
+   本仓库中的 LoRA adapter 权重（model/adapter_model.safetensors 及相关配置）、
+   全部源代码（src/、tools/、tests/、使用示例.py）、文档（README.md、
+   README-模型说明书.md、model/MODEL_CARD.json 等）以及合成数据与基准的说明文件
+   （schema/、ontology/、benchmark/、reports/），均以 Creative Commons
+   Attribution-NonCommercial-ShareAlike 4.0 International
+   （署名—非商业性使用—相同方式共享）发布，全文见根目录 LICENSE 文件。
+   即：可以非商业地使用、复制、再分发与改作，但必须署名，且衍生作品必须以
+   相同许可发布；任何商业用途均不在授权范围内。
+
+2. 底座模型 — Apache-2.0（不受上述非商业条款约束）
+   本 adapter 必须配合底座模型 Qwen/Qwen2.5-1.5B-Instruct 使用。底座由
+   Qwen（Alibaba Cloud）发布，遵循 Apache License 2.0，其权利与义务以底座
+   原始许可为准（官方仓库：https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct，
+   许可文件随完整版 base_model/ 目录附带为 LICENSE）。本项目的 CC BY-NC-SA 4.0
+   许可不改变、不限制底座自身的 Apache-2.0 授权；同理，底座的 Apache-2.0
+   也不使本项目的 adapter、代码与文档获得商业使用授权。
+
+3. 训练数据声明
+   训练与评测数据 100% 由确定性生成器合成（src/generate_synthetic_data.py，
+   seed=42），不含任何真实用户订单、账号或账单数据。

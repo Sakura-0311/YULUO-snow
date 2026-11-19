@@ -1,0 +1,109 @@
+{
+  "model_name": "YULUO-snow",
+  "version": "1.0",
+  "release_date": "2026-11-19",
+  "artifact_type": "LoRA adapter (PEFT)",
+  "base_model": "Qwen/Qwen2.5-1.5B-Instruct",
+  "task": "消费条款结构化抽取 + 原文证据锚定 + 未知弃答",
+  "project": "承诺单：下单前看清账",
+  "competition": "2026 Qoder 高校创造力大赛 · LifeHack",
+  "language": [
+    "zh"
+  ],
+  "license_note": "本项目（adapter 权重、代码、文档）以 CC BY-NC-SA 4.0 发布，禁止商业用途；adapter 仅可配合其底座模型使用，底座 Qwen/Qwen2.5-1.5B-Instruct 遵循其原始 Apache-2.0 许可，不受非商业条款约束",
+  "files": {
+    "adapter_model.safetensors": "LoRA 权重 (r=16, alpha=32), F32, 73.91 MB",
+    "adapter_config.json": "PEFT 配置",
+    "tokenizer.json": "tokenizer（与底座一致，便于离线加载）",
+    "tokenizer_config.json": "tokenizer 配置",
+    "chat_template.jinja": "对话模板"
+  },
+  "lora": {
+    "r": 16,
+    "lora_alpha": 32,
+    "lora_dropout": 0.05,
+    "bias": "none",
+    "task_type": "CAUSAL_LM",
+    "target_modules": [
+      "q_proj",
+      "k_proj",
+      "v_proj",
+      "o_proj",
+      "gate_proj",
+      "up_proj",
+      "down_proj"
+    ],
+    "trainable_params": 18464768,
+    "total_params": 1562179072,
+    "trainable_pct": 1.182
+  },
+  "training": {
+    "quantization": "4-bit NF4 with double quant",
+    "epochs": 2,
+    "learning_rate": 0.0002,
+    "max_length": 2048,
+    "batch_size": 1,
+    "grad_accum": 16,
+    "optimizer_steps": 126,
+    "final_train_loss": 0.002,
+    "hardware": "Kaggle GPU T4 x2 (free tier)",
+    "data": "1000 条确定性合成样本 (generator seed=42)，零真实用户数据",
+    "held_out": "100 条，按模板族分组切分防泄漏"
+  },
+  "evaluation_reanchored": {
+    "json_parse_rate": 0.96,
+    "field_exact_match": 0.8654,
+    "evidence_span_f1": 0.8429,
+    "uncertainty_status_f1": 0.917,
+    "hallucination_rate_on_unknown": 0.0,
+    "evidence_coverage_rate": 0.7422,
+    "strict_structure_validity": 0.0,
+    "baseline_base_zero_shot": {
+      "json_parse_rate": 0.88,
+      "field_exact_match": 0.3431,
+      "evidence_span_f1": 0.0,
+      "uncertainty_status_f1": 0.0,
+      "hallucination_rate_on_unknown": 1.0,
+      "evidence_coverage_rate": 0.0
+    }
+  },
+  "usage_notes": [
+    "必须配合 spanfix.reanchor() 使用：模型输出的字符偏移不可靠，需用 quote 在原文中确定性重定位",
+    "金额一律整数分；status 三态 stated/unknown/contradicted；unknown 时 evidence 必须为空",
+    "总额计算交给 calculator.py，不要让模型自己算钱",
+    "max_len 2048，超长条款需分段"
+  ],
+  "limitations": [
+    "仅合成数据训练，真实页面存在分布差异",
+    "长文本截断风险",
+    "不做法律判断",
+    "复杂嵌套条件识别率下降"
+  ],
+  "precision": {
+    "weights_dtype": "F32",
+    "weights_file_bytes": 73911112,
+    "weights_file_mb": 73.91,
+    "f32_original_bytes": 73911112,
+    "f32_original_mb": 73.91,
+    "reduction": "50.0%",
+    "why": "peft 默认以 fp32 存盘；推理本身按 fp16 计算，因此 fp16 存盘不损失可用精度",
+    "verified": {
+      "tool": "tools/verify_fp16.py",
+      "max_abs_error": 1.521e-05,
+      "max_rel_error_above_1e-4": 0.000488,
+      "note": "4.88e-04 = 2^-11，正好是 fp16 10 位尾数的一个 ULP（理论下限）",
+      "underflow_to_zero": "171 / 18,464,768 = 0.001%",
+      "inf_nan": 0,
+      "verdict": "PASS"
+    },
+    "edition": "full"
+  },
+  "tools": {
+    "tools/convert_fp16.py": "F32->F16 转换（重建 safetensors 头与每个 data_offsets）",
+    "tools/verify_fp16.py": "转换后逐张量对账：绝对误差/相对误差/下溢/inf-nan"
+  },
+  "archive": {
+    "f32_original": "本包即 F32 完整版，权重为原始训练产物；F16 精简版为同一权重的半精度转换，对账见 precision.verified",
+    "benchmark_resolution": "tests/test_rule_baseline.py 自动查找 benchmark/benchmark_cases.json；可用 YULUO_BENCH 覆盖"
+  }
+}

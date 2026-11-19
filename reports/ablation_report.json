@@ -1,0 +1,56 @@
+{
+  "task": "承诺单：下单前看清账 — 消费条款结构化抽取 + 原文 Span 锚定 + 未知弃答",
+  "model_base": "Qwen/Qwen2.5-1.5B-Instruct",
+  "tuning": {
+    "method": "4-bit QLoRA (nf4)",
+    "r": 16,
+    "alpha": 32,
+    "epochs": 2,
+    "max_len": 2048,
+    "lr": 0.0002,
+    "optimizer_steps": 126,
+    "final_train_loss": 0.002,
+    "trainable_params": 18464768,
+    "trainable_pct": 1.182
+  },
+  "data": {
+    "train": 1000,
+    "val_held_out": 100,
+    "evaluated": 100,
+    "split": "grouped by template family (no template leakage)",
+    "source": "deterministic synthetic generator seed=42, zero real user data"
+  },
+  "hardware": "Kaggle GPU T4 x2 (30h free tier)",
+  "decode": {
+    "batch_size": 6,
+    "max_new_tokens": 704,
+    "do_sample": false,
+    "stop_ids": [
+      151645,
+      151645
+    ]
+  },
+  "base_zero_shot": {
+    "total_cases": 100,
+    "structure_validity_rate": 0.0,
+    "field_exact_match": 0.3431,
+    "evidence_span_f1": 0.0,
+    "uncertainty_status_f1": 0.0,
+    "hallucination_rate_on_unknown": 1.0
+  },
+  "qlora_finetuned": {
+    "total_cases": 100,
+    "structure_validity_rate": 0.0,
+    "field_exact_match": 0.8654,
+    "evidence_span_f1": 0.355,
+    "uncertainty_status_f1": 0.917,
+    "hallucination_rate_on_unknown": 0.0
+  },
+  "delta": {
+    "structure_validity_rate": 0.0,
+    "field_exact_match": 0.5223,
+    "evidence_span_f1": 0.355,
+    "uncertainty_status_f1": 0.917,
+    "hallucination_rate_on_unknown": -1.0
+  }
+}

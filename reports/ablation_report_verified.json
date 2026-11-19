@@ -1,0 +1,91 @@
+{
+  "task": "承诺单：下单前看清账 — 消费条款结构化抽取 + 原文 Span 锚定 + 未知弃答",
+  "model_base": "Qwen/Qwen2.5-1.5B-Instruct",
+  "tuning": {
+    "method": "4-bit QLoRA (nf4, double quant)",
+    "r": 16,
+    "alpha": 32,
+    "epochs": 2,
+    "max_len": 2048,
+    "lr": 0.0002,
+    "optimizer_steps": 126,
+    "final_train_loss": 0.002,
+    "trainable_params": 18464768,
+    "total_params": 1562179072,
+    "trainable_pct": 1.182
+  },
+  "data": {
+    "train": 1000,
+    "val_held_out": 100,
+    "evaluated": 100,
+    "split": "grouped by template family (no template leakage)",
+    "source": "deterministic synthetic generator seed=42, zero real user data",
+    "max_token_len_observed": 1259,
+    "truncated_samples": 0
+  },
+  "hardware": "Kaggle GPU T4 x2 (30h free tier)",
+  "decode": {
+    "batch_size": 6,
+    "max_new_tokens": 704,
+    "do_sample": false
+  },
+  "results_reanchored": {
+    "base": {
+      "structure_validity_rate": 0.0,
+      "field_exact_match": 0.3431,
+      "evidence_span_f1": 0.0,
+      "uncertainty_status_f1": 0.0,
+      "hallucination_rate_on_unknown": 1.0
+    },
+    "qlora": {
+      "structure_validity_rate": 0.0,
+      "field_exact_match": 0.8654,
+      "evidence_span_f1": 0.8429,
+      "uncertainty_status_f1": 0.917,
+      "hallucination_rate_on_unknown": 0.0
+    }
+  },
+  "results_raw": {
+    "base": {
+      "structure_validity_rate": 0.0,
+      "field_exact_match": 0.3431,
+      "evidence_span_f1": 0.0,
+      "uncertainty_status_f1": 0.0,
+      "hallucination_rate_on_unknown": 1.0
+    },
+    "qlora": {
+      "structure_validity_rate": 0.0,
+      "field_exact_match": 0.8654,
+      "evidence_span_f1": 0.355,
+      "uncertainty_status_f1": 0.917,
+      "hallucination_rate_on_unknown": 0.0
+    }
+  },
+  "json_parse_rate": { "base": 0.88, "qlora": 0.96 },
+  "evidence_coverage_rate": { "base": 0.0, "qlora": 0.7422 },
+  "span_stats": {
+    "base": { "spans": 0, "fixed": 0, "already_ok": 0, "unresolved": 0 },
+    "qlora": { "spans": 336, "fixed": 192, "already_ok": 141, "unresolved": 3 }
+  },
+  "span_resolve_rate": { "base": 0.0, "qlora": 0.9911 },
+  "delta": {
+    "structure_validity_rate": 0.0,
+    "field_exact_match": 0.5223,
+    "evidence_span_f1": 0.8429,
+    "uncertainty_status_f1": 0.917,
+    "hallucination_rate_on_unknown": -1.0
+  },
+  "evaluation_protocol": {
+    "strict_validity": "JSON Schema + 每个非 unknown 字段必须有 evidence，且 text[start_char:end_char] 严格等于 quote；任一缺陷即整条无效",
+    "finding_1": "基座零样本几乎不产出 evidence span（100 条共 0 个），因此 Span F1 与严格合法率都为 0",
+    "finding_2": "QLoRA 会引用原文但偏移不精确：336 个 span 中仅 141 个（42%）偏移本来就对，严格合法率因此仍是 0 —— 这是度量方式与模型能力错位，不是没学会",
+    "fix": "spanfix.reanchor 用 quote 在原文中确定性定位、并把 quote 归一为原文切片，不生成任何新文本；Span F1 由 0.3550 提升到 0.8429，可解决率 99.1%",
+    "remaining_gap": "重锚定后严格合法率仍为 0，因为该指标是全或无：100 条里每条都有至少一处缺证据或不可恢复 span（4 条 JSON 解析失败 + 3 个 span 不可恢复）"
+  },
+  "verification": {
+    "spanfix_unit_tests": "test_spanfix.py: 5/5 通过（含偏移+7 复现失败模式、重锚定恢复 1.0、伪造 quote 必须 unresolved、输入不得被修改）",
+    "no_input_mutation": "Kaggle 内 mutated=False 断言通过",
+    "notebook_version": "Kaggle commitment-finetune-qwen Version #1 (Successful)",
+    "validator_regression": "validate_extraction 现已接受 str 路径（此前 AttributeError: 'str' object has no attribute 'exists'）"
+  }
+}
