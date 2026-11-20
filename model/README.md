@@ -2,14 +2,13 @@
 
 > 模型名 **YULUO-snow**（项目「承诺单：下单前看清账」，2026 Qoder 高校创造力大赛 · LifeHack）
 > 底座 `Qwen/Qwen2.5-1.5B-Instruct`｜4-bit QLoRA (r=16, alpha=32)｜126 步｜loss 0.0020
-> 权重精度 **F32 / 73.91 MB**（本包为完整版；另有 F16 精简版 36.98 MB）
+> 权重精度 **F16 / 36.98 MB**（F32 原件 73.91 MB 另存云端）
 > **使用前必读**：`../README-模型说明书.md`。推理后必须调用 `src/spanfix.reanchor()` 修正字符偏移。
 
 ---
 
 ---
 base_model: Qwen/Qwen2.5-1.5B-Instruct
-license: cc-by-nc-sa-4.0
 library_name: peft
 pipeline_tag: text-generation
 tags:
@@ -37,7 +36,7 @@ tags:
 - **Shared by [optional]:** [More Information Needed]
 - **Model type:** [More Information Needed]
 - **Language(s) (NLP):** [More Information Needed]
-- **License:** CC BY-NC-SA 4.0（本 adapter，禁止商业用途）；底座 Qwen/Qwen2.5-1.5B-Instruct 为 Apache-2.0
+- **License:** [More Information Needed]
 - **Finetuned from model [optional]:** [More Information Needed]
 
 ### Model Sources [optional]

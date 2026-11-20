@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+*.log
+
+# 模型产物（体积大，按需自行生成）
+*.gguf
+merged*/
+*_adapter_model.F32.safetensors.bak
+
+# 运行时缓存
+.cache/
+*.jsonl.tmp
+
+# 编辑器
+.vscode/
+.idea/
+.DS_Store

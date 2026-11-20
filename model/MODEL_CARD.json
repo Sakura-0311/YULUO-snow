@@ -10,9 +10,9 @@
   "language": [
     "zh"
   ],
-  "license_note": "本项目（adapter 权重、代码、文档）以 CC BY-NC-SA 4.0 发布，禁止商业用途；adapter 仅可配合其底座模型使用，底座 Qwen/Qwen2.5-1.5B-Instruct 遵循其原始 Apache-2.0 许可，不受非商业条款约束",
+  "license_note": "adapter 仅可配合其底座模型使用；底座许可遵循原始协议",
   "files": {
-    "adapter_model.safetensors": "LoRA 权重 (r=16, alpha=32), F32, 73.91 MB",
+    "adapter_model.safetensors": "LoRA 权重 (r=16, alpha=32), F16, 36.98 MB",
     "adapter_config.json": "PEFT 配置",
     "tokenizer.json": "tokenizer（与底座一致，便于离线加载）",
     "tokenizer_config.json": "tokenizer 配置",
@@ -68,8 +68,7 @@
     }
   },
   "usage_notes": [
-    "⚠️ adapter 与 4-bit 底座耦合（2026-11-20 实测）：只能按训练同配置加载（底座 4-bit NF4 + double quant + compute fp16）；底座改 fp16 加载、merge_and_unload 合并到 fp16、转 GGUF q4 均实测退化，禁止这样部署",
-    "提示词必须与训练 SYSTEM_PROMPT 完全一致，追加约束实测会把严格通过率从 2/5 打到 0/5（5 例部署抽测）",
+    "⚠️ QLoRA 耦合（2026-11-20 实测）：禁止把 adapter 直接合并进原始 fp16 底座（行为退化为基座）；GGUF 路径必须先用 tools/merge_into_dequant.py 合并进反量化后的 4-bit 权重，再转 Q8_0，详见 docs/FINDINGS.md",
     "必须配合 spanfix.reanchor() 使用：模型输出的字符偏移不可靠，需用 quote 在原文中确定性重定位",
     "金额一律整数分；status 三态 stated/unknown/contradicted；unknown 时 evidence 必须为空",
     "总额计算交给 calculator.py，不要让模型自己算钱",
@@ -80,16 +79,16 @@
     "长文本截断风险",
     "不做法律判断",
     "复杂嵌套条件识别率下降",
-    "adapter 与 4-bit 底座耦合：无可用的合并版/GGUF 部署路径；无 CUDA 时关掉 4-bit 用 fp16 底座能加载但输出不可信"
+    "直接合并进 fp16 底座会静默退化；仅反量化 4-bit 合并路径（Q8_0）保真"
   ],
   "precision": {
-    "weights_dtype": "F32",
-    "weights_file_bytes": 73911112,
-    "weights_file_mb": 73.91,
+    "weights_dtype": "F16",
+    "weights_file_bytes": 36981464,
+    "weights_file_mb": 36.98,
     "f32_original_bytes": 73911112,
     "f32_original_mb": 73.91,
     "reduction": "50.0%",
-    "why": "peft 默认以 fp32 存盘；训练同配置（4-bit 底座）下计算按 fp16 进行，因此 adapter 以 fp16 存盘不损失可用精度——注意这指 adapter 存盘精度，底座必须保持 4-bit 加载，改 fp16 加载会退化",
+    "why": "peft 默认以 fp32 存盘；推理本身按 fp16 计算，因此 fp16 存盘不损失可用精度",
     "verified": {
       "tool": "tools/verify_fp16.py",
       "max_abs_error": 1.521e-05,
@@ -98,15 +97,14 @@
       "underflow_to_zero": "171 / 18,464,768 = 0.001%",
       "inf_nan": 0,
       "verdict": "PASS"
-    },
-    "edition": "full"
+    }
   },
   "tools": {
     "tools/convert_fp16.py": "F32->F16 转换（重建 safetensors 头与每个 data_offsets）",
     "tools/verify_fp16.py": "转换后逐张量对账：绝对误差/相对误差/下溢/inf-nan"
   },
   "archive": {
-    "f32_original": "本包即 F32 完整版，权重为原始训练产物；F16 精简版为同一权重的半精度转换，对账见 precision.verified",
+    "f32_original": "由作者本地归档，不随 F16 包附带（本包精度见 precision.verified）",
     "benchmark_resolution": "tests/test_rule_baseline.py 自动查找 benchmark/benchmark_cases.json；可用 YULUO_BENCH 覆盖"
   }
 }

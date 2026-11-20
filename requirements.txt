@@ -4,3 +4,16 @@ peft>=0.12
 bitsandbytes>=0.43
 accelerate>=0.34
 jsonschema>=4.0
+
+# ---- 部署服务端（server/app.py）需要 ----
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.5
+
+# ---- 可选：4-bit 推理 / 合并（对应 docs/FINDINGS.md 发现 2）----
+# bitsandbytes>=0.46.1
+# kernels>=0.11.1      # bitsandbytes 在 CPU 上做 4-bit 需要它
+
+# 底座模型（运行时自动从 HF 拉取，约 3GB）
+# Qwen/Qwen2.5-1.5B-Instruct
+
