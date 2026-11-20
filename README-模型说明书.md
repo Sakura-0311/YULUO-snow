@@ -50,7 +50,7 @@
 | 精度 | 权重文件 | 说明 |
 | --- | --- | --- |
 | **F32（本包 = 完整版）** | **73.91 MB** | peft 默认存盘精度，原始训练产物，零精度损失 |
-| F16（精简版，另行发布） | 36.98 MB | 由 F32 转换；推理本就按 fp16 计算，精度无实质损失 |
+| F16（精简版，另行发布） | 36.98 MB | 由 F32 转换；指 adapter 权重存盘精度——训练同配置（4-bit 底座）下计算本就按 fp16，无实质损失；**不代表底座可改用 fp16 加载（会退化，见 §8 第 7 条）** |
 
 转换不是简单改 dtype —— safetensors 头部记录每个张量的 `data_offsets`，必须整体重建。转换后用 `tools/verify_fp16.py` 逐张量对账，实测：
 
@@ -108,7 +108,7 @@ pip install -r requirements.txt
 ```
 
 需要：`torch`、`transformers>=4.45`、`peft>=0.12`、`bitsandbytes>=0.43`、`accelerate`、`jsonschema`。
-4-bit 加载需要 CUDA；纯 CPU 可跑（慢，且 bnb 需 `load_in_4bit=False` 改成 fp32）。
+4-bit 加载需要 CUDA；**纯 CPU 不要把 `load_in_4bit` 关掉改用 fp32/fp16 底座——能加载但行为退化、输出不可信（见 §8 第 7 条）**。
 
 ### 5.2 最小调用
 
@@ -235,6 +235,8 @@ print(json.dumps({"valid": ok, "errors": errs, "extracted": pred,
 4. **不做法律判断**：它不评价条款是否合法、是否霸王条款。
 5. **`unknown` 是特性不是缺陷**：宁可少说，不说错。下游不要把 `unknown` 当成"没有此条款"。
 6. **1.5B 小模型的边界**：复杂嵌套条件（如"满 3 件且非特价商品方可用券"）识别率会明显下降，建议配合规则。
+7. **adapter 与 4-bit 底座耦合（2026-11-20 部署实测）**：LoRA 增量是在带量化噪声的 4-bit 底座上学出来的（合并后权重相对变化仅约 2.7e-3）。实测：底座改 fp16 加载 + adapter 输出退化；`merge_and_unload` 合并到 fp16 再转 GGUF q4 会退化成基座行为。transformers 4.46 与 5.x 均复现，排除版本因素。**只能按训练同配置（4-bit NF4 + double quant + compute fp16）加载使用，目前没有可用的合并版 / GGUF 部署路径。**注意 §3.1 说的「fp16 无实质损失」只指 adapter 权重自身的存盘精度（F16 vs F32），不是说底座可以用 fp16 加载。
+8. **提示词高度敏感**：必须使用与训练完全一致的 `SYSTEM_PROMPT`，不要追加约束或改写。部署抽测（5 例）中追加约束提示后严格通过率从 2/5 掉到 0/5（span 产出从 19 个掉到 2 个、字段开始缺 `status`）。
 
 ---
 

@@ -10,6 +10,24 @@
 
 ---
 
+## ⚠️ 重要：adapter 与 4-bit 底座耦合（2026-11-20 部署实测）
+
+**本 adapter 只能在训练同配置下使用：底座以 4-bit NF4（double quant、compute dtype fp16）加载，再挂 adapter。** 以下做法已逐项实测，都会让模型行为退化，不要做：
+
+| 做法 | 实测结果 |
+| --- | --- |
+| 4-bit 底座 + adapter（训练同配置） | ✅ 正常 |
+| 底座改 fp16 加载 + adapter | ❌ 输出退化（如首字段名写错） |
+| `merge_and_unload` 合并到 fp16 后转 GGUF q4 | ❌ 退化成基座行为 |
+
+原因：LoRA 增量是在带量化噪声的 4-bit 底座上学出来的（合并后权重相对变化仅约 2.7e-3），换到干净 fp16 参考系就错位，再经 q4 量化基本被抹平。这是 QLoRA 的固有耦合，不是加载姿势问题；transformers 4.46 与 5.x 均复现，排除版本因素。**因此本模型目前没有可用的 GGUF / 合并版部署路径，加速方案另行研究中。**
+
+另外两条部署须知：
+
+- **提示词必须与训练时完全一致**（`SYSTEM_PROMPT` 见 `src/generate_synthetic_data.py`）。模型对提示词极其敏感：部署抽测中追加约束提示后，严格通过率从 2/5 掉到 0/5。不要自行增删提示词。
+- **没有 CUDA 时不要关掉 4-bit 硬跑**：fp16 底座能加载，但行为退化、输出不可信（见上表）。
+- 部署环境抽测（2026-11-20，CPU 服务器、5 例小样本，非留出集指标）：端到端 62–80 秒/条，严格通过 2/5，主要失败原因是给商品名编造未知商品 / 服务并伪造证据（3/5 例栽在同一处）。留出集指标见下一节，两者口径不同，不要混读。
+
 ## 效果（100 条留出样本，Kaggle T4 x2 实测）
 
 同一批样本、同一套指标，底座零样本 vs YULUO-snow（经 `spanfix` 重锚定后）：
@@ -34,7 +52,7 @@
 pip install -r requirements.txt
 ```
 
-需要 `torch`、`transformers>=4.45`、`peft>=0.12`、`bitsandbytes>=0.43`、`accelerate`、`jsonschema`。4-bit 加载需要 CUDA；纯 CPU 可跑（慢，且需把 `load_in_4bit` 关掉）。
+需要 `torch`、`transformers>=4.45`、`peft>=0.12`、`bitsandbytes>=0.43`、`accelerate`、`jsonschema`。4-bit 加载需要 CUDA；**纯 CPU 关掉 4-bit 后行为会退化，不要这样部署**（见上方耦合警告）。
 
 ### 加载（底座 + adapter）
 
