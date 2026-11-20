@@ -69,11 +69,19 @@ python tests/test_spanfix.py             # 5 项：字符偏移重锚定
 python tests/test_rule_baseline.py       # 朴素规则基线，作为对照
 ```
 
-起一个本地 API（首次会自动拉 3GB 底座，需要 GPU 或足够内存）：
+起本地 API（本文件自带 CLI 入口）：
 
 ```bash
-python server/app.py --engine hf --port 8099
+python server/app.py --port 8099
 curl -s http://127.0.0.1:8099/v1/health
+```
+
+注意：本服务本身不含推理能力，它需要一个 llama.cpp 后端（默认 `127.0.0.1:8081`）。
+没有后端时 `/v1/health` 照常返回，`/v1/extract` 会如实返回 `503 backend_down`。
+要跑完整链路（含推理）请用 `server/deploy.sh`，或直接调线上端点：
+
+```bash
+curl -s https://yuluo.sakura1225.cloud/yuluo/v1/health
 ```
 
 ## 仓库结构

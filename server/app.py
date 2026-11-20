@@ -1,14 +1,15 @@
-"""YULUO-snow 限时 API —— llama.cpp(Q8_0) 引擎版
+#!/usr/bin/env python3
+"""YULUO-snow 限时推理 API 服务端。
 
-关键前提（踩过的坑，别再改回去）：
-QLoRA 的增量是在「nf4 4-bit 量化后的底座」上学出来的。直接把 adapter 合并进
-原始 fp16 底座再转 GGUF，行为会退化为基座（键名变 product_service、完全没有
-evidence）。正确做法是合并进 **反量化后的 4-bit 权重**（见 merge_into_dequant.py），
-产物 merged4deq → GGUF Q8_0，既保住训练行为，又能用 llama.cpp 跑得快。
+两种启动方式：
+  1) 直接跑（本文件带 CLI）：        python server/app.py --port 8099
+  2) 交给 uvicorn（生产推荐）：      uvicorn app:app --host 127.0.0.1 --port 8000
 
-模型只负责「读懂并引用」；字符偏移重锚定与算钱交给确定性代码
-（spanfix / validator / calculator），校验不通过就如实返回错误。
+依赖一个 llama.cpp 后端（默认 127.0.0.1:8081/v1/chat/completions）提供推理；
+没有后端时 /v1/health 仍可访问，但 /v1/extract 会如实返回 503 backend_down。
+完整部署见 server/deploy.sh。
 """
+import argparse
 import json
 import os
 import sys
@@ -49,9 +50,16 @@ if _extra:
 
 _hits = defaultdict(deque)
 app = FastAPI(title="YULUO-snow limited inference API", version="3.0")
-app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS,
-                   allow_methods=["GET", "POST", "OPTIONS"],
-                   allow_headers=["content-type", "x-api-key"], max_age=600)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    # 开发期允许 localhost / 127.0.0.1 任意端口：本地起站点调接口时也会发预检，
+    # 不放行会在浏览器里表现为“请求被 CORS 拦截”，很难排查。
+    allow_origin_regex=r"^http://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["content-type", "x-api-key"],
+    max_age=600,
+)
 
 
 class ExtractIn(BaseModel):
@@ -117,15 +125,6 @@ def first_json_object(raw):
     return None
 
 
-def backend_alive():
-    base = LLAMA_URL.split("/v1/")[0]
-    try:
-        with urllib.request.urlopen(base + "/health", timeout=3) as r:
-            return r.status == 200
-    except Exception:
-        return False
-
-
 # ---------------------------------------------------------------- 归一
 PLACEHOLDERS = ("未知商品", "未知服务", "未知产品", "未知内容", "未知", "未提及",
                 "未说明", "未给出", "未命名", "unknown", "Unknown", "UNKNOWN",
@@ -148,6 +147,15 @@ def normalize_placeholders(obj):
             ps["status"] = "unknown"
             ps["evidence"] = []
     return obj
+
+
+def backend_alive():
+    base = LLAMA_URL.split("/v1/")[0]
+    try:
+        with urllib.request.urlopen(base + "/health", timeout=3) as r:
+            return r.status == 200
+    except Exception:
+        return False
 
 
 # ---------------------------------------------------------------- 路由
@@ -203,30 +211,32 @@ def extract(body: ExtractIn, request: Request):
     if not backend_alive():
         return JSONResponse(status_code=503, content={
             "ok": False, "reason": "backend_down",
-            "message": "推理后端未就绪，请稍后重试"})
+            "message": "推理后端未就绪，请稍后重试（见 server/deploy.sh）"})
 
     sid = (body.source_id or "web_input")[:64]
-    payload = json.dumps({
+    req_body = {
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": "source_id: " + sid + NL + "待抽取文本：" + NL + text},
+            {"role": "user",
+             "content": "source_id: " + sid + NL + "待抽取文本：" + NL + text},
         ],
         "max_tokens": N_PREDICT,
         "temperature": 0.0,
         "top_p": 1.0,
         "stream": False,
+    }
+    if SCHEMA_OBJ is not None:
         # 受语法约束的解码：把 schema 交给 llama.cpp，在解码阶段就排除
         # 「自创字段 / 缺 required / 枚举越界」，结构错误归零。
-        "response_format": {
+        req_body["response_format"] = {
             "type": "json_schema",
             "json_schema": {"name": "commitment", "schema": SCHEMA_OBJ,
                             "strict": True},
-        },
-    }).encode()
+        }
 
     t0 = time.time()
     try:
-        req = urllib.request.Request(LLAMA_URL, data=payload,
+        req = urllib.request.Request(LLAMA_URL, data=json.dumps(req_body).encode(),
                                      headers={"content-type": "application/json"})
         with urllib.request.urlopen(req, timeout=420) as r:
             raw = json.loads(r.read())["choices"][0]["message"]["content"]
@@ -255,3 +265,21 @@ def extract(body: ExtractIn, request: Request):
     return {"ok": valid, "engine": "llama.cpp/Q8_0", "elapsed_s": elapsed,
             "errors": errs, "span_reanchor": stats,
             "extracted": anchored, "totals": totals}
+
+
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser(description="YULUO-snow limited inference API")
+    ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--port", type=int, default=8099)
+    ap.add_argument("--backend", default=None,
+                    help="llama.cpp 后端地址，默认 http://127.0.0.1:8081/v1/chat/completions")
+    args = ap.parse_args()
+    if args.backend:
+        LLAMA_URL = args.backend
+
+    import uvicorn
+    ok, left = deadline_state()
+    print(f"[api] 评审期至 {DEADLINE:%Y-%m-%d %H:%M} (+08) | open={ok} | 剩余 {left//3600}h")
+    print(f"[api] 后端 {LLAMA_URL} | ready={backend_alive()}")
+    print(f"[api] http://{args.host}:{args.port}/v1/health")
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
